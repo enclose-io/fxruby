@@ -1,0 +1,65 @@
+name: macOS
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+jobs:
+  make:
+    strategy:
+      matrix:
+        os: [macos-10.15]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          path: src
+      - name: "[Enclose.IO] Install dependencies"
+        run: |
+          brew upgrade
+          brew install squashfs
+      - name: "[Enclose.IO] Set up rubyc"
+        run: |
+          curl -OL https://github.com/pmq20/ruby-packer/releases/download/darwin-x64/rubyc
+          chmod +x rubyc
+      - name: "[Enclose.IO] Check dependencies"
+        run: |
+          sw_vers
+          uname -a
+          uname -p
+          uname -m
+          sysctl -n machdep.cpu.brand_string
+          which mksquashfs
+          mksquashfs -version
+          which ruby
+          ruby -v
+      - name: "[Enclose.IO] MAIN"
+        run: |
+          export PATH="$(pwd):$PATH"
+          cd src
+          which rubyc
+          rubyc --version
+          rubyc draw_polygon.rb
+      - name: "[Enclose.IO] Create macOS Release"
+        if: ${{ github.ref == 'refs/heads/master' && success() }}
+        id: create_macos_release
+        uses: pmq20/create-release@delete-old-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: darwin
+          release_name: draw_polygon - macOS single binary
+          draft: false
+          prerelease: false
+          replace_old_tag: true
+      - name: "[Enclose.IO] Upload macOS Release"
+        if: ${{ github.ref == 'refs/heads/master' && success() }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_macos_release.outputs.upload_url }}
+          asset_path: src/a.out
+          asset_name: draw_polygon
+          asset_content_type: application/octet-stream

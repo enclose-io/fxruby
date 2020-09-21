@@ -1,0 +1,63 @@
+name: Linux
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+jobs:
+  make:
+    strategy:
+      matrix:
+        os: [ubuntu-20.04]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: "[Enclose.IO] Install dependencies"
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential squashfs-tools
+      - uses: actions/checkout@v2
+        with:
+          path: src
+      - name: "[Enclose.IO] Set up rubyc"
+        run: |
+          curl -OL https://github.com/pmq20/ruby-packer/releases/download/linux-x64/rubyc
+          chmod +x rubyc
+      - name: "[Enclose.IO] Check dependencies"
+        run: |
+          cat /etc/issue
+          uname -a
+          uname -p
+          uname -m
+          lscpu
+          which mksquashfs
+          mksquashfs -version
+      - name: "[Enclose.IO] MAIN"
+        run: |
+          export PATH="$(pwd):$PATH"
+          cd src
+          which rubyc
+          rubyc --version
+          rubyc draw_polygon.rb
+      - name: "[Enclose.IO] Create Linux Release"
+        if: ${{ github.ref == 'refs/heads/master' && success() }}
+        id: create_linux_release
+        uses: pmq20/create-release@delete-old-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: linux
+          release_name: draw_polygon - Linux single binary
+          draft: false
+          prerelease: false
+          replace_old_tag: true
+      - name: "[Enclose.IO] Upload Linux Release"
+        if: ${{ github.ref == 'refs/heads/master' && success() }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_linux_release.outputs.upload_url }}
+          asset_path: src/a.out
+          asset_name: draw_polygon
+          asset_content_type: application/octet-stream
